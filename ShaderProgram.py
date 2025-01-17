@@ -14,17 +14,25 @@ class ShaderProgram:
 
         self.app = app
         self.context = app.context
+        self.player = app.player
+
+        # Shaders stored by the program
         self.quad = self.get_program('quad')
+
+        self.set_uniforms_on_init()
 
     
     def set_uniforms_on_init(self) -> None:
-        pass
+        "Sets the initial matrices to match the player position"
+
+        self.quad["projectionMatrix"].write(self.player.projectionMatrix)
+        self.quad["modelMatrix"].write(glm.mat4())
 
 
     def update(self) -> None:
         "Updates the Shader Program"
 
-        pass
+        self.quad["viewMatrix"].write(self.player.viewMatrix)
 
 
     def get_program(self, shaderName: str) -> mgl.Program:

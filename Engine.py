@@ -5,6 +5,7 @@ import sys
 from settings import *
 from ShaderProgram import ShaderProgram
 from Scene import Scene
+from Player import Player
 
 pygame.init()
 
@@ -36,6 +37,9 @@ class Engine:
         self.deltaTime = 0
         self.time = 0
 
+        pygame.event.set_grab(True)
+        #pygame.mouse.set_visible(False)
+
         self.isRunning = True
         self.on_init()
 
@@ -43,6 +47,7 @@ class Engine:
     def on_init(self) -> None:
         "Handles further logic executes during the __init__ method"
         
+        self.player = Player(self)
         self.shaderProgram = ShaderProgram(self)
         self.scene = Scene(self)
 
@@ -52,6 +57,7 @@ class Engine:
 
         self.shaderProgram.update()
         self.scene.update()
+        self.player.update()
 
         self.deltaTime = self.clock.tick()
         self.time = pygame.time.get_ticks() * 0.001
