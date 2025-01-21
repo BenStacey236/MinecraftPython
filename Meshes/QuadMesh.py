@@ -3,10 +3,10 @@ from overrides import overrides
 
 from settings import *
 from Meshes.BaseMesh import BaseMesh
-
+import Engine
 
 class QuadMesh(BaseMesh):
-    def __init__(self, app):
+    def __init__(self, app: 'Engine.Engine'):
         "Class that stores Quad Mesh Data"
 
         super().__init__()

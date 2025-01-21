@@ -1,22 +1,23 @@
 from settings import *
-from Meshes.QuadMesh import QuadMesh
+from World import World
+import Engine
 
 
 class Scene:
-    def __init__(self, app) -> None:
+    def __init__(self, app: 'Engine.Engine') -> None:
         "Class that stores and renders the current Scene"
 
         self.app = app
-        self.quad = QuadMesh(self.app)
+        self.world = World(self.app)
 
 
     def update(self) -> None:
         "Updates the current scene"
 
-        pass
+        self.world.update()
 
 
     def render(self) -> None:
         "Renders the current scene"
         
-        self.quad.render()
+        self.world.render()

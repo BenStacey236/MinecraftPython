@@ -17,7 +17,7 @@ class ShaderProgram:
         self.player = app.player
 
         # Shaders stored by the program
-        self.quad = self.get_program('quad')
+        self.chunk = self.get_program('chunk')
 
         self.set_uniforms_on_init()
 
@@ -25,14 +25,15 @@ class ShaderProgram:
     def set_uniforms_on_init(self) -> None:
         "Sets the initial matrices to match the player position"
 
-        self.quad["projectionMatrix"].write(self.player.projectionMatrix)
-        self.quad["modelMatrix"].write(glm.mat4())
+        self.chunk["projectionMatrix"].write(self.player.projectionMatrix)
+        self.chunk["modelMatrix"].write(glm.mat4())
+        self.chunk["u_texture_0"] = 0
 
 
     def update(self) -> None:
         "Updates the Shader Program"
 
-        self.quad["viewMatrix"].write(self.player.viewMatrix)
+        self.chunk["viewMatrix"].write(self.player.viewMatrix)
 
 
     def get_program(self, shaderName: str) -> mgl.Program:

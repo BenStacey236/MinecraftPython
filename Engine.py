@@ -6,6 +6,7 @@ from settings import *
 from ShaderProgram import ShaderProgram
 from Scene import Scene
 from Player import Player
+from Textures import Textures
 
 pygame.init()
 
@@ -47,6 +48,7 @@ class Engine:
     def on_init(self) -> None:
         "Handles further logic executes during the __init__ method"
         
+        self.textures = Textures(self)
         self.player = Player(self)
         self.shaderProgram = ShaderProgram(self)
         self.scene = Scene(self)

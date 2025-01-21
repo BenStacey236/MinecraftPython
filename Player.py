@@ -2,10 +2,11 @@ import pygame
 
 from settings import *
 from Camera import Camera
+import Engine
 
 
 class Player(Camera):
-    def __init__(self, app, position=PLAYER_POS, yaw=-90, pitch=0):
+    def __init__(self, app: 'Engine.Engine', position=PLAYER_POS, yaw=-90, pitch=0):
         "Class that stores player data and related camera data"
 
         super().__init__(position, yaw, pitch)
