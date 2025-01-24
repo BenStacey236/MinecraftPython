@@ -14,10 +14,32 @@ FACE ID's ARE AS FOLLOWS:
 
 
 @njit
-def to_uint8(x, y, z, voxelID, faceID):
-    "Converts all arguments to uint8"
+def pack_data(x: int, y: int, z: int, voxelID: int, faceID: int, aoValue: int, needFlip: int) -> int:
+    """
+    Packs all data into a single 32 bit unsigned integer. The format of the 32 bit integer is as below:
     
-    return uint8(x), uint8(y), uint8(z), uint8(voxelID), uint8(faceID)
+    x: 6 bits (0-32 in chunk)
+    y: 6 bits (0-32 in chunk)
+    z: 6 bits (0-32 in chunk)
+    voxelID: 8 bits (255 block types)
+    faceID: 3 bits (faces 0-5)
+    aoValue: 2 bits (values 0-3)
+    needFlip: 1 bit (bool 0 or 1)
+    """
+
+    yLen, zLen, voxelIDLen, faceIDLen, aoValueLen, needFlipLen = 6, 6, 8, 3, 2, 1
+
+    packedData = (
+        x << yLen + zLen + voxelIDLen + faceIDLen + aoValueLen + needFlipLen |
+        y << zLen + voxelIDLen + faceIDLen + aoValueLen + needFlipLen |
+        z << voxelIDLen + faceIDLen + aoValueLen + needFlipLen |
+        voxelID << faceIDLen + aoValueLen + needFlipLen |
+        faceID << aoValueLen + needFlipLen |
+        aoValue <<  needFlipLen |
+        needFlip
+    )
+
+    return packedData
 
 
 @njit
@@ -73,7 +95,7 @@ def is_void(voxelPos: tuple[int, int, int], worldVoxelPos: tuple[int, int, int],
 
 
 @njit
-def add_data(vertexData: np.array, index: int, *vertices: tuple[tuple[int, ...]]) -> int:
+def add_data(vertexData: np.array, index: int, *vertices: int) -> int:
     """
     Adds any vertices provided to the vertexData array and updates the index pointer
 
@@ -85,11 +107,78 @@ def add_data(vertexData: np.array, index: int, *vertices: tuple[tuple[int, ...]]
     """
 
     for vertex in vertices:
-        for attribute in vertex:
-            vertexData[index] = attribute
-            index += 1
+        vertexData[index] = vertex
+        index += 1
 
     return index
+
+
+@njit
+def calc_ambient_occlusion(voxelPos: tuple[int, int, int], worldVoxelPos: tuple[int, int, int], worldVoxels: np.array, plane: str) -> tuple[int, int, int, int]:
+    """
+    Calculates the ambient occlusion value for a given voxel by checking the presence of blocks around the face. The block location
+    names surrounding the given face are as follows:
+
+    +---+---+---+\n
+    |nw | n |ne |\n
+    +---+---+---+\n
+    | w | F | e |\n
+    +---+---+---+\n
+    |sw | s |se |\n
+    +---+---+---+\n
+
+    :param tuple voxelPos: The position of the voxel within a given chunk
+    :param tuple worldVoxelPos: The position of the voxel within the world
+    :param np.array worldVoxels: An array of all of the world Voxels
+    :param str plane: The plane of the face
+
+    :returns: The ambient occlusion values for the four corners of the face
+
+    :raises: Exception if plane is invalid
+    """
+
+    x, y, z = voxelPos
+    worldX, worldY, worldZ = worldVoxelPos
+
+    # For top and bottom faces
+    if plane == 'Y':
+        n =  is_void((x    , y, z - 1), (worldX    , worldY, worldZ - 1), worldVoxels)
+        nw = is_void((x - 1, y, z - 1), (worldX - 1, worldY, worldZ - 1), worldVoxels)
+        w =  is_void((x - 1, y, z    ), (worldX - 1, worldY, worldZ    ), worldVoxels)
+        sw = is_void((x - 1, y, z + 1), (worldX - 1, worldY, worldZ + 1), worldVoxels)
+        s =  is_void((x    , y, z + 1), (worldX    , worldY, worldZ + 1), worldVoxels)
+        se = is_void((x + 1, y, z + 1), (worldX + 1, worldY, worldZ + 1), worldVoxels)
+        e =  is_void((x + 1, y, z    ), (worldX + 1, worldY, worldZ    ), worldVoxels)
+        ne = is_void((x + 1, y, z - 1), (worldX + 1, worldY, worldZ - 1), worldVoxels)
+
+    # For left and right faces
+    elif plane == 'X':
+        n =  is_void((x, y    , z - 1), (worldX, worldY    , worldZ - 1), worldVoxels)
+        nw = is_void((x, y - 1, z - 1), (worldX, worldY - 1, worldZ - 1), worldVoxels)
+        w =  is_void((x, y - 1, z    ), (worldX, worldY - 1, worldZ    ), worldVoxels)
+        sw = is_void((x, y - 1, z + 1), (worldX, worldY - 1, worldZ + 1), worldVoxels)
+        s =  is_void((x, y    , z + 1), (worldX, worldY    , worldZ + 1), worldVoxels)
+        se = is_void((x, y + 1, z + 1), (worldX, worldY + 1, worldZ + 1), worldVoxels)
+        e =  is_void((x, y + 1, z    ), (worldX, worldY + 1, worldZ    ), worldVoxels)
+        ne = is_void((x, y + 1, z - 1), (worldX, worldY + 1, worldZ - 1), worldVoxels)
+
+    # For front and back faces
+    elif plane == 'Z':
+        n =  is_void((x - 1, y    , z), (worldX - 1, worldY    , worldZ), worldVoxels)
+        nw = is_void((x - 1, y - 1, z), (worldX - 1, worldY - 1, worldZ), worldVoxels)
+        w =  is_void((x    , y - 1, z), (worldX    , worldY - 1, worldZ), worldVoxels)
+        sw = is_void((x + 1, y - 1, z), (worldX + 1, worldY - 1, worldZ), worldVoxels)
+        s =  is_void((x + 1, y    , z), (worldX + 1, worldY    , worldZ), worldVoxels)
+        se = is_void((x + 1, y + 1, z), (worldX + 1, worldY + 1, worldZ), worldVoxels)
+        e =  is_void((x    , y + 1, z), (worldX    , worldY + 1, worldZ), worldVoxels)
+        ne = is_void((x - 1, y + 1, z), (worldX - 1, worldY + 1, worldZ), worldVoxels)
+
+    else:
+        raise Exception(f"Invalid plane value: {plane}")
+
+    aoValues = (n + nw + w), (e + ne + n), (s + se + e), (w + sw + s)
+
+    return aoValues
 
 
 @njit
@@ -106,7 +195,7 @@ def build_chunk_mesh(chunkVoxels: np.array, formatSize: int, chunkPos: tuple[int
     """
 
     # 18 Comes from the maximum number of vertices visible on one voxel at any time
-    vertexData = np.empty(CHUNK_VOLUME * 18 * formatSize, dtype = 'uint8')
+    vertexData = np.empty(CHUNK_VOLUME * 18 * formatSize, dtype = 'uint32')
     index = 0
 
 
@@ -126,63 +215,99 @@ def build_chunk_mesh(chunkVoxels: np.array, formatSize: int, chunkPos: tuple[int
 
                 # Checks whether to add top face to mesh
                 if is_void((x, y + 1, z), (worldX, worldY + 1, worldZ), worldVoxels):
-                    v0 = to_uint8(x    , y + 1, z    , voxelID, 0)
-                    v1 = to_uint8(x + 1, y + 1, z    , voxelID, 0)
-                    v2 = to_uint8(x + 1, y + 1, z + 1, voxelID, 0)
-                    v3 = to_uint8(x    , y + 1, z + 1, voxelID, 0)
+                    aoValues = calc_ambient_occlusion((x, y + 1, z), (worldX, worldY + 1, worldZ), worldVoxels, 'Y')
+                    needFlip = aoValues[1] + aoValues[3] > aoValues[0] + aoValues[2]
+                    
+                    v0 = pack_data(x    , y + 1, z    , voxelID, 0, aoValues[0], needFlip)
+                    v1 = pack_data(x + 1, y + 1, z    , voxelID, 0, aoValues[1], needFlip)
+                    v2 = pack_data(x + 1, y + 1, z + 1, voxelID, 0, aoValues[2], needFlip)
+                    v3 = pack_data(x    , y + 1, z + 1, voxelID, 0, aoValues[3], needFlip)
 
-                    # Adding vertices for 2 triangles clockwise
-                    index = add_data(vertexData, index, v0, v3, v2, v0, v2, v1)
+                    # Adding vertices for 2 triangles clockwise (Flips the triangles if needed to avoid anisotropy)
+                    if needFlip:
+                        index = add_data(vertexData, index, v1, v0, v3, v1, v3, v2)
+                    else:
+                        index = add_data(vertexData, index, v0, v3, v2, v0, v2, v1)
 
                 # Checks whether to add bottom face to mesh
                 if is_void((x, y - 1, z), (worldX, worldY - 1, worldZ), worldVoxels):
-                    v0 = to_uint8(x    , y, z    , voxelID, 1)
-                    v1 = to_uint8(x + 1, y, z    , voxelID, 1)
-                    v2 = to_uint8(x + 1, y, z + 1, voxelID, 1)
-                    v3 = to_uint8(x    , y, z + 1, voxelID, 1)
+                    aoValues = calc_ambient_occlusion((x, y - 1, z), (worldX, worldY - 1, worldZ), worldVoxels, 'Y')
+                    needFlip = aoValues[1] + aoValues[3] > aoValues[0] + aoValues[2]
 
-                    # Adding vertices for 2 triangles clockwise
-                    index = add_data(vertexData, index, v0, v2, v3, v0, v1, v2)
+                    v0 = pack_data(x    , y, z    , voxelID, 1, aoValues[0], needFlip)
+                    v1 = pack_data(x + 1, y, z    , voxelID, 1, aoValues[1], needFlip)
+                    v2 = pack_data(x + 1, y, z + 1, voxelID, 1, aoValues[2], needFlip)
+                    v3 = pack_data(x    , y, z + 1, voxelID, 1, aoValues[3], needFlip)
+
+                    # Adding vertices for 2 triangles clockwise (Flips the triangles if needed to avoid anisotropy)
+                    if needFlip:
+                        index = add_data(vertexData, index, v1, v3, v0, v1, v2, v3)
+                    else:
+                        index = add_data(vertexData, index, v0, v2, v3, v0, v1, v2)
 
                 # Checks whether to add right face to mesh
                 if is_void((x + 1, y, z), (worldX + 1, worldY, worldZ), worldVoxels):
-                    v0 = to_uint8(x + 1, y    , z    , voxelID, 2)
-                    v1 = to_uint8(x + 1, y + 1, z    , voxelID, 2)
-                    v2 = to_uint8(x + 1, y + 1, z + 1, voxelID, 2)
-                    v3 = to_uint8(x + 1, y    , z + 1, voxelID, 2)
+                    aoValues = calc_ambient_occlusion((x + 1, y, z), (worldX + 1, worldY, worldZ), worldVoxels, 'X')
+                    needFlip = aoValues[1] + aoValues[3] > aoValues[0] + aoValues[2]
 
-                    # Adding vertices for 2 triangles clockwise
-                    index = add_data(vertexData, index, v0, v1, v2, v0, v2, v3)
+                    v0 = pack_data(x + 1, y    , z    , voxelID, 2, aoValues[0], needFlip)
+                    v1 = pack_data(x + 1, y + 1, z    , voxelID, 2, aoValues[1], needFlip)
+                    v2 = pack_data(x + 1, y + 1, z + 1, voxelID, 2, aoValues[2], needFlip)
+                    v3 = pack_data(x + 1, y    , z + 1, voxelID, 2, aoValues[3], needFlip)
+
+                    # Adding vertices for 2 triangles clockwise (Flips the triangles if needed to avoid anisotropy)
+                    if needFlip:
+                        index = add_data(vertexData, index, v3, v0, v1, v3, v1, v2)
+                    else:
+                        index = add_data(vertexData, index, v0, v1, v2, v0, v2, v3)
 
                 # Checks whether to add left face to mesh
                 if is_void((x - 1, y, z), (worldX - 1, worldY, worldZ), worldVoxels):
-                    v0 = to_uint8(x, y    , z    , voxelID, 3)
-                    v1 = to_uint8(x, y + 1, z    , voxelID, 3)
-                    v2 = to_uint8(x, y + 1, z + 1, voxelID, 3)
-                    v3 = to_uint8(x, y    , z + 1, voxelID, 3)
+                    aoValues = calc_ambient_occlusion((x - 1, y, z), (worldX - 1, worldY, worldZ), worldVoxels, 'X')
+                    needFlip = aoValues[1] + aoValues[3] > aoValues[0] + aoValues[2]
 
-                    # Adding vertices for 2 triangles clockwise
-                    index = add_data(vertexData, index, v0, v2, v1, v0, v3, v2)
+                    v0 = pack_data(x, y    , z    , voxelID, 3, aoValues[0], needFlip)
+                    v1 = pack_data(x, y + 1, z    , voxelID, 3, aoValues[1], needFlip)
+                    v2 = pack_data(x, y + 1, z + 1, voxelID, 3, aoValues[2], needFlip)
+                    v3 = pack_data(x, y    , z + 1, voxelID, 3, aoValues[3], needFlip)
+
+                    # Adding vertices for 2 triangles clockwise (Flips the triangles if needed to avoid anisotropy)
+                    if needFlip:
+                        index = add_data(vertexData, index, v3, v1, v0, v3, v2, v1)
+                    else:
+                        index = add_data(vertexData, index, v0, v2, v1, v0, v3, v2)
 
                 # Checks whether to add back face to mesh
                 if is_void((x, y, z - 1), (worldX, worldY, worldZ - 1), worldVoxels):
-                    v0 = to_uint8(x    , y    , z, voxelID, 4)
-                    v1 = to_uint8(x    , y + 1, z, voxelID, 4)
-                    v2 = to_uint8(x + 1, y + 1, z, voxelID, 4)
-                    v3 = to_uint8(x + 1, y    , z, voxelID, 4)
+                    aoValues = calc_ambient_occlusion((x, y, z - 1), (worldX, worldY, worldZ - 1), worldVoxels, 'Z')
+                    needFlip = aoValues[1] + aoValues[3] > aoValues[0] + aoValues[2]
 
-                    # Adding vertices for 2 triangles clockwise
-                    index = add_data(vertexData, index, v0, v1, v2, v0, v2, v3)
+                    v0 = pack_data(x    , y    , z, voxelID, 4, aoValues[0], needFlip)
+                    v1 = pack_data(x    , y + 1, z, voxelID, 4, aoValues[1], needFlip)
+                    v2 = pack_data(x + 1, y + 1, z, voxelID, 4, aoValues[2], needFlip)
+                    v3 = pack_data(x + 1, y    , z, voxelID, 4, aoValues[3], needFlip)
+
+                    # Adding vertices for 2 triangles clockwise (Flips the triangles if needed to avoid anisotropy)
+                    if needFlip:
+                        index = add_data(vertexData, index, v3, v0, v1, v3, v1, v2)
+                    else:
+                        index = add_data(vertexData, index, v0, v1, v2, v0, v2, v3)
 
                 # Checks whether to add front face to mesh
                 if is_void((x, y, z + 1), (worldX, worldY, worldZ + 1), worldVoxels):
-                    v0 = to_uint8(x    , y    , z + 1, voxelID, 5)
-                    v1 = to_uint8(x    , y + 1, z + 1, voxelID, 5)
-                    v2 = to_uint8(x + 1, y + 1, z + 1, voxelID, 5)
-                    v3 = to_uint8(x + 1, y    , z + 1, voxelID, 5)
+                    aoValues = calc_ambient_occlusion((x, y, z + 1), (worldX, worldY, worldZ + 1), worldVoxels, 'Z')
+                    needFlip = aoValues[1] + aoValues[3] > aoValues[0] + aoValues[2]
 
-                    # Adding vertices for 2 triangles clockwise
-                    index = add_data(vertexData, index, v0, v2, v1, v0, v3, v2)
+                    v0 = pack_data(x    , y    , z + 1, voxelID, 5, aoValues[0], needFlip)
+                    v1 = pack_data(x    , y + 1, z + 1, voxelID, 5, aoValues[1], needFlip)
+                    v2 = pack_data(x + 1, y + 1, z + 1, voxelID, 5, aoValues[2], needFlip)
+                    v3 = pack_data(x + 1, y    , z + 1, voxelID, 5, aoValues[3], needFlip)
+
+                    # Adding vertices for 2 triangles clockwise (Flips the triangles if needed to avoid anisotropy)
+                    if needFlip:
+                        index = add_data(vertexData, index, v3, v1, v0, v3, v2, v1)
+                    else:
+                        index = add_data(vertexData, index, v0, v2, v1, v0, v3, v2)
 
     # Only return the none empty areas of the array that has vertex data in
     return vertexData[:index + 1]

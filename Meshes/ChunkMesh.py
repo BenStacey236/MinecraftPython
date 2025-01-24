@@ -21,9 +21,9 @@ class ChunkMesh(BaseMesh):
         self.context = self.app.context
         self.shaderProgram = self.app.shaderProgram.chunk
 
-        self.vboFormat = "3u1 1u1 1u1"
+        self.vboFormat = "1u4"
         self.formatSize = sum(int(format[:1]) for format in self.vboFormat.split())
-        self.attrs = ("inPosition", "voxelID", "faceID")
+        self.attrs = ("packedData",)
         self.vao = self.get_vao()
 
 
