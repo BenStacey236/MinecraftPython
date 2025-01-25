@@ -38,7 +38,7 @@ class Engine:
         self.deltaTime = 0
         self.time = 0
 
-        pygame.event.set_grab(True)
+        #pygame.event.set_grab(True)
         #pygame.mouse.set_visible(False)
 
         self.isRunning = True
@@ -82,14 +82,16 @@ class Engine:
             if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 self.isRunning = False
 
+            self.player.handle_event(event)
+
 
     def run(self) -> None:
         "Main function that runs the engine"
 
         # Runs main game loop while running
         while self.isRunning:
-            self.handle_events()
             self.update()
+            self.handle_events()
             self.render()
 
         # Quits properly after running

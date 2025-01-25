@@ -1,3 +1,5 @@
+import random
+
 from settings import *
 from Meshes.ChunkMesh import ChunkMesh
 import World
@@ -33,6 +35,7 @@ class Chunk:
 
         # fill chunk
         chunkX, chunkY, chunkZ = glm.ivec3(self.position) * CHUNK_SIZE
+        chunkBlockType = random.randrange(1, 100)
 
         for x in range(CHUNK_SIZE):
             for z in range(CHUNK_SIZE):
@@ -43,7 +46,7 @@ class Chunk:
 
                 for y in range(localHeight):
                     worldY = y + chunkY
-                    voxels[x + CHUNK_SIZE * z + CHUNK_AREA * y] = worldY + 1
+                    voxels[x + CHUNK_SIZE * z + CHUNK_AREA * y] = chunkBlockType
 
         if np.any(voxels):
             self.isEmpty = False

@@ -58,3 +58,22 @@ class Player(Camera):
 
         if changeY:
             self.change_pitch(changeY * MOUSE_SENITIVITY)
+
+    
+    def handle_event(self, event: pygame.event):
+        """
+        Handles a pygame event
+        
+        :param pygame.event event: The event to be handled
+        """
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            voxelHandler = self.app.scene.world.voxelHandler
+
+            if event.button == 1:
+                voxelHandler.switch_interaction_mode(0)
+                voxelHandler.set_voxel()
+            
+            if event.button == 3:
+                voxelHandler.switch_interaction_mode(1)
+                voxelHandler.set_voxel()

@@ -1,5 +1,6 @@
 from settings import *
 from WorldObjects.Chunk import Chunk
+from VoxelHandler import VoxelHandler
 import Engine
 
 
@@ -17,6 +18,7 @@ class World:
         self.voxels = np.empty([WORLD_VOLUME, CHUNK_VOLUME], dtype='uint8')
         self.build_chunks()
         self.build_chunk_meshes()
+        self.voxelHandler = VoxelHandler(self)
 
 
     def build_chunks(self) -> None:
@@ -45,7 +47,7 @@ class World:
     def update(self) -> None:
         "Updates the world"
 
-        pass
+        self.voxelHandler.update()
 
 
     def render(self) -> None:
